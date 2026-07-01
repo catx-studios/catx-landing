@@ -1,0 +1,17 @@
+{
+  "name": "catx-landing",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "catx-studios landing site",
+  "scripts": {
+    "dev": "vite",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3",
+    "vite": "^8.1.2"
+  }
+}
