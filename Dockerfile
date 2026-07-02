@@ -1,11 +1,9 @@
-# Multi-stage: build the Vite site with a current Node, serve the static output via nginx.
-FROM node:22-alpine AS build
+# Build the Vite site with a current Node (Vite 8 needs >=22.12; Coolify's
+# nixpacks builder only offers 22.11, so we pin the build environment here).
+# Coolify's static build pack then serves the resulting /app/dist via nginx.
+FROM node:22-alpine
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
 RUN npm run build
-
-FROM nginx:alpine
-COPY --from=build /app/dist /usr/share/nginx/html
-EXPOSE 80
