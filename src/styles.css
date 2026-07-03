@@ -1,13 +1,20 @@
 :root { --bg: #050505; }
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
+* {
+  margin: 0; padding: 0; box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent; /* no grey flash on tap (iOS) */
+}
 
 html, body {
   width: 100%; height: 100%;
   background: var(--bg);
   overflow: hidden;
-  font-family: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, monospace;
+  overscroll-behavior: none;                 /* no rubber-band / pull-to-refresh */
+  touch-action: manipulation;                /* no double-tap-to-zoom (pinch-zoom is not web-blockable on iOS) */
+  font-family: "Space Mono", "SF Mono", "JetBrains Mono", ui-monospace, Menlo, monospace;
   -webkit-font-smoothing: antialiased;
+  -webkit-touch-callout: none;               /* no long-press save/share callout */
+  user-select: none; -webkit-user-select: none; /* no text selection on drag */
 }
 
 #topo { position: fixed; inset: 0; display: block; }
@@ -24,6 +31,7 @@ html, body {
   border: 1px solid rgba(255, 255, 255, 0.10);
   overflow: hidden; will-change: transform;
   pointer-events: auto; cursor: crosshair;
+  touch-action: manipulation; /* no tap-delay / double-tap-zoom on the boxes */
 }
 .box canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
@@ -76,9 +84,55 @@ html, body {
   .brand { font-size: 11px; bottom: 20px; }
 }
 
+/* About overlay — brief bio card that resolves in like smoke over the scene.
+   Enter/exit are transitions so the effect reverses symmetrically on close. */
+.about { position: fixed; inset: 0; z-index: 100; }
+.about[hidden] { display: none; }
+
+.about__backdrop {
+  position: absolute; inset: 0;
+  background: rgba(5, 5, 5, 0.55);
+  -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+  opacity: 0; transition: opacity 0.45s ease;
+}
+
+.about__panel {
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, calc(-50% + 16px)) scale(1.04);
+  max-width: min(420px, 82vw); padding: 30px 34px;
+  background: rgba(10, 10, 10, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow: 0 40px 120px rgba(0, 0, 0, 0.9), inset 0 0 40px rgba(0, 0, 0, 0.5);
+  color: rgba(255, 255, 255, 0.75);
+  opacity: 0; filter: blur(24px);
+  transition: opacity 0.6s ease, filter 0.6s ease,
+              transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.about.is-open .about__backdrop { opacity: 1; }
+.about.is-open .about__panel {
+  opacity: 1; filter: blur(0);
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.about__close {
+  position: absolute; top: 8px; right: 14px;
+  background: none; border: 0; padding: 4px;
+  color: rgba(255, 255, 255, 0.5); font-size: 20px; line-height: 1; cursor: pointer;
+}
+.about__close:hover { color: rgba(255, 255, 255, 0.85); }
+.about__eyebrow {
+  font-size: 11px; letter-spacing: 0.32em; text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4); margin-bottom: 14px;
+}
+.about__body { font-size: 14px; line-height: 1.7; letter-spacing: 0.02em; }
+
 /* Reduced motion: freeze CSS drift + brand pulse. The topo drift, box hover-morph,
-   and cursor glow are frozen in JS (a single static frame is rendered). */
+   and cursor glow are frozen in JS (a single static frame is rendered). The about
+   overlay collapses its smoke transition to near-instant (keeps transitionend firing
+   so the close handler still resolves). */
 @media (prefers-reduced-motion: reduce) {
   .box { animation: none !important; }
   .brand { animation: none !important; opacity: 0.6; }
+  .about__backdrop, .about__panel { transition-duration: 0.01ms !important; }
 }

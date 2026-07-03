@@ -2,7 +2,10 @@
 // can't be created (caller filters those out — the box degrades to its CSS border).
 import { VERT, FRAG } from './shaders';
 import { currentDPR } from '../env';
-import { HOVER_EASE, type BoxDef } from '../config';
+import { HOVER_EASE, BURST_DECAY, type BoxDef } from '../config';
+import { installHaptic, tapHaptic } from '../haptics';
+
+const clamp01 = (n: number): number => Math.min(1, Math.max(0, n));
 
 export type DrawBox = (time: number) => void;
 
@@ -47,17 +50,40 @@ export function makeBox(canvas: HTMLCanvasElement, def: BoxDef, animate: boolean
   const uPattern = gl.getUniformLocation(prog, 'uPattern');
   const uColor = gl.getUniformLocation(prog, 'uColor');
   const uHover = gl.getUniformLocation(prog, 'uHover');
+  const uTouch = gl.getUniformLocation(prog, 'uTouch');
+  const uBurst = gl.getUniformLocation(prog, 'uBurst');
 
   const color: [number, number, number] = [
     def.color[0] / 255, def.color[1] / 255, def.color[2] / 255,
   ];
   let w = 0, h = 0, hover = 0, hoverAmp = 0;
+  let touchU = 0.5, touchV = 0.5, burst = 0;
   const host = canvas.parentElement;
-  if (host && animate) {
-    host.addEventListener('pointerenter', () => { hover = 1; });
-    host.addEventListener('pointerleave', () => { hover = 0; });
-    host.addEventListener('pointerdown', () => { hover = 1; });
-    host.addEventListener('pointerup', () => { hover = 0; });
+  if (host) {
+    installHaptic(host); // iOS: covering `switch` overlay; real touch fires the base Taptic tick
+
+    const setTouch = (e: PointerEvent): void => {
+      const r = host.getBoundingClientRect();
+      touchU = clamp01((e.clientX - r.left) / Math.max(r.width, 1));
+      touchV = clamp01(1 - (e.clientY - r.top) / Math.max(r.height, 1)); // flip: WebGL uv.y is bottom-up
+    };
+
+    // Touch feedback fires regardless of reduced motion (it gates visual motion, not
+    // haptics). The shockwave/hover uniforms only matter when the render loop runs.
+    host.addEventListener('pointerdown', (e) => {
+      setTouch(e);
+      burst = 1;    // fire the shockwave from the touch point
+      hover = 1;
+      if (e.pointerType === 'touch') tapHaptic(); // uniform crisp tick; per-box identity is visual
+    });
+    if (animate) {
+      const release = (): void => { hover = 0; };
+      host.addEventListener('pointermove', (e) => { if (hover || burst > 0.05) setTouch(e); });
+      host.addEventListener('pointerenter', () => { hover = 1; }); // desktop hover
+      host.addEventListener('pointerup', release);
+      host.addEventListener('pointerleave', release);
+      host.addEventListener('pointercancel', release); // iOS canceled the gesture — don't stick "pressed"
+    }
   }
 
   return function draw(time: number): void {
@@ -69,6 +95,8 @@ export function makeBox(canvas: HTMLCanvasElement, def: BoxDef, animate: boolean
       gl.viewport(0, 0, canvas.width, canvas.height);
     }
     hoverAmp += (hover - hoverAmp) * HOVER_EASE; // ease hover in/out
+    burst *= BURST_DECAY;                        // decay the touch shockwave
+    if (burst < 0.002) burst = 0;
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.uniform1f(uTime, time * 0.001);
     gl.uniform2f(uSize, cw, ch);
@@ -76,6 +104,8 @@ export function makeBox(canvas: HTMLCanvasElement, def: BoxDef, animate: boolean
     gl.uniform1i(uPattern, def.pattern);
     gl.uniform3f(uColor, color[0], color[1], color[2]);
     gl.uniform1f(uHover, hoverAmp);
+    gl.uniform2f(uTouch, touchU, touchV);
+    gl.uniform1f(uBurst, burst);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   };
 }

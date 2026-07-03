@@ -28,6 +28,7 @@ export const MAX_ALPHA = AMBIENT + GLOW_BASE * 1.15;
 
 // --- Floating WebGL pattern boxes ---
 export const HOVER_EASE = 0.09; // box hover-morph ease-in/out per frame
+export const BURST_DECAY = 0.92; // per-frame decay of the touch-burst envelope (~0.5s tail)
 
 export interface BoxDef {
   cls: string; // CSS class carrying position / size / drift keyframes
